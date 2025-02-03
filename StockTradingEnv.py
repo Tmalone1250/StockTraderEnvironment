@@ -55,12 +55,12 @@ class ForwardDynamicsModel(nn.Module):
         optimizer.zero_grad()
 
 class StockTradingEnv(gym.Env):
-    def __init__(self, df, initial_balance=10000, live_trading=False):
+    def __init__(self, df, initial_balance=10000, max_leverage=2.0, live_trading=False):
         super(StockTradingEnv, self).__init__()
         self.df = df
         self.initial_balance = initial_balance
+        self.max_leverage = max_leverage
         self.live_trading = live_trading
-        self.max_leverage = 2.0
         self.margin_requirement = 0.3
         
         # Initialize Robinhood trader if live trading is enabled
@@ -80,11 +80,11 @@ class StockTradingEnv(gym.Env):
         self.max_drawdown_limit = -0.25
         self.volatility_scaling = True
         
-        # Action space: 0 = Strong Sell (2x short), 1 = Sell (1x short), 2 = Hold, 3 = Buy (1x long), 4 = Strong Buy (2x long)
-        self.action_space = spaces.Discrete(5)
+        # Action space: 0 = Strong Sell (2x short), 1 = Sell (1x short), 2 = Hold, 3 = Buy (1x long), 4 = Strong Buy (2x long), 5 = Maximum Leverage Buy
+        self.action_space = spaces.Discrete(6)
         
         self.observation_space = spaces.Box(
-            low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
+            low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32
         )
         
         self.dynamics_model = ForwardDynamicsModel(
@@ -121,7 +121,8 @@ class StockTradingEnv(gym.Env):
             1: -1.0,  # Sell
             2: 0.0,   # Hold
             3: 1.0,   # Buy
-            4: 2.0    # Strong Buy
+            4: 2.0,   # Strong Buy
+            5: self.max_leverage  # Maximum Leverage Buy
         }
         
         multiplier = position_multipliers[action]
@@ -365,7 +366,8 @@ class StockTradingEnv(gym.Env):
             float(current_step_data['ATR']) if 'ATR' in current_step_data else 0.0,  # ATR
             self.balance,  # Current balance
             self.holdings,  # Current holdings
-            self.portfolio_value  # Current portfolio value
+            self.portfolio_value,  # Current portfolio value
+            self.max_leverage  # Maximum leverage
         ], dtype=np.float32)
         
         return obs
@@ -417,7 +419,7 @@ def test_scenario(env, strategy_name, risk_factor=2.0):
         
         # Print step information
         print(f"\nStep {env.current_step}/{len(env.df)-1}")
-        print(f"Action: {['Strong Sell', 'Sell', 'Hold', 'Buy', 'Strong Buy'][action]}")
+        print(f"Action: {['Strong Sell', 'Sell', 'Hold', 'Buy', 'Strong Buy', 'Maximum Leverage Buy'][action]}")
         print(f"Reward: {reward:.2f}")
         print(f"Prediction Error: {info['prediction_error']:.6f}")
         print(f"Portfolio Value: {info['portfolio_value']:.2f}")
@@ -480,7 +482,7 @@ if __name__ == "__main__":
     print("\nInitializing environment with bear market data...")
     
     # Create and test environment
-    env = StockTradingEnv(bear_market_data)
+    env = StockTradingEnv(bear_market_data, max_leverage=2.0)
     print("Environment initialized\n")
     
     print("Testing Aggressive Buy and Hold strategy...\n")
