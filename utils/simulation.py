@@ -15,9 +15,11 @@ def run_simulation(strategy_func, df, initial_capital=10000.0):
     returns = np.full(len(df), np.nan)
     holdings = np.full(len(df), np.nan)
     position_sizes = np.full(len(df), np.nan)
+    cash = np.full(len(df), np.nan)
     
     # Set initial values
     portfolio_values[0] = initial_capital
+    cash[0] = initial_capital
     returns[0] = 0.0
     
     # Initialize strategy state
@@ -27,22 +29,33 @@ def run_simulation(strategy_func, df, initial_capital=10000.0):
     # Run simulation
     for step in range(len(df)):
         try:
-            # Get current market data
             current_price = df['Close'].iloc[step]
             
             # Get position size from strategy
             position_size, state = strategy_func(state, df, step)
             position_sizes[step] = position_size
             
-            # Calculate holdings and portfolio value
-            current_holdings = position_size * initial_capital
-            if step > 0:
+            # Calculate holdings value
+            if step == 0:
+                holdings[step] = position_size * initial_capital
+                cash[step] = initial_capital - holdings[step]
+            else:
                 # Update holdings based on price change
                 price_change = current_price / df['Close'].iloc[step-1]
-                current_holdings = holdings[step-1] * price_change
+                holdings[step] = holdings[step-1] * price_change
+                
+                # If position size changed, adjust holdings and cash
+                if position_sizes[step] != position_sizes[step-1]:
+                    # Close out old position
+                    cash[step] = cash[step-1] + holdings[step]
+                    # Enter new position
+                    holdings[step] = cash[step] * position_sizes[step]
+                    cash[step] = cash[step] - holdings[step]
+                else:
+                    cash[step] = cash[step-1]
             
-            holdings[step] = current_holdings
-            portfolio_values[step] = current_holdings
+            # Calculate total portfolio value
+            portfolio_values[step] = cash[step] + holdings[step]
             
             # Calculate returns
             if step > 0:
@@ -57,6 +70,7 @@ def run_simulation(strategy_func, df, initial_capital=10000.0):
             if step > 0:
                 portfolio_values[step] = portfolio_values[step-1]
                 holdings[step] = holdings[step-1]
+                cash[step] = cash[step-1]
                 position_sizes[step] = position_sizes[step-1]
                 returns[step] = 0.0
     
