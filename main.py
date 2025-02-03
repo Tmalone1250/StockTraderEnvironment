@@ -1,16 +1,16 @@
 """Main simulation script"""
 
 from data.market_data import get_market_data
+from strategies.rl_strategy import rl_enhanced_strategy, RLState
 from utils.simulation import run_simulation
-from strategies.ml_strategy import ml_enhanced_strategy, MLState
 
 def main():
     # Get market data
-    df = get_market_data('GOOGL', '1y')
+    df = get_market_data(symbol='GOOGL', period='1y')
     
-    # Run simulation with ML enhanced strategy
-    initial_state = MLState()
-    run_simulation(df, ml_enhanced_strategy, initial_state)
+    # Run simulation with RL strategy
+    initial_state = RLState()
+    final_portfolio_value, performance_metrics = run_simulation(df, rl_enhanced_strategy, initial_state)
 
 if __name__ == "__main__":
     main()
